@@ -13,25 +13,39 @@ export function MicroFrontend({
   supportSources,
 }: MicroFrontendProps) {
   useEffect(() => {
-    const scriptId = `micro_frontend_main_script_${id}`;
+    let aborted = false;
 
-    if (document.getElementById(scriptId)) {
-      renderMicroFrontend(id);
-      return;
+    function safelyRenderMicroFrontend() {
+      if (!aborted) {
+        renderMicroFrontend(id);
+      }
     }
 
-    supportSources?.forEach((src, i) =>
-      ScriptBuilder.create()
-        .id(`micro_frontend_support_script_${id}_${i + 1}`)
-        .src(src)
-        .append()
-    );
+    const scriptId = `micro_frontend_main_script_${id}`;
+    const script = document.getElementById(scriptId);
 
-    ScriptBuilder.create()
-      .id(scriptId)
-      .src(mainSource)
-      .onload(() => renderMicroFrontend(id))
-      .append();
+    if (script) {
+      renderMicroFrontend(id);
+      script.onload = safelyRenderMicroFrontend;
+    } else {
+      supportSources?.forEach((src, i) =>
+        ScriptBuilder.create()
+          .id(`micro_frontend_support_script_${id}_${i + 1}`)
+          .src(src)
+          .append()
+      );
+
+      ScriptBuilder.create()
+        .id(scriptId)
+        .src(mainSource)
+        .onload(safelyRenderMicroFrontend)
+        .append();
+    }
+
+    return () => {
+      aborted = true;
+      unmountMicroFrontend(id);
+    };
   }, [id, mainSource, supportSources]);
 
   return <div id={`${id}_root`}></div>;
@@ -41,5 +55,12 @@ function renderMicroFrontend(id: string) {
   const render = window[`render_${id}` as keyof Window];
   if (typeof render === "function") {
     render(`${id}_root`);
+  }
+}
+
+function unmountMicroFrontend(id: string) {
+  const unmount = window[`unmount_${id}` as keyof Window];
+  if (typeof unmount === "function") {
+    unmount();
   }
 }
