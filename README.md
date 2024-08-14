@@ -57,7 +57,7 @@ To let our guest run as a standalone application as well, we add a `script` tag 
 </script>
 ```
 
-Implementing an Angular guest is very similar to this. Feel free to look at `angular-guest/` for an example.
+Implementing an Angular guest is similar to this, but it is a bit more complicated due to the asynchronous nature of creating an Angular application. Feel free to look at `angular-guest/` for an example.
 
 You can build both guests with `npm run build` and serve them through NGINX so that the host can reference them later.
 

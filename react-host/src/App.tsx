@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 
 const reactGuest = {
   id: "react_guest",
-  mainSource: "http://localhost:8002/assets/index-PqXtgA7T.js",
+  mainSource: "http://localhost:8002/assets/index-CYhDH8Pq.js",
 };
 
 const angularGuest = {
   id: "angular_guest",
-  mainSource: "http://localhost:8003/main-FFIUWFFI.js",
+  mainSource: "http://localhost:8003/main-WSKM47JJ.js",
   supportSources: ["http://localhost:8003/polyfills-SCHOHYNV.js"],
 };
 
