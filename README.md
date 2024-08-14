@@ -376,10 +376,3 @@ At this point, you may wonder why our guests need to explicitly ask for the curr
 No, because when our guests initially render, they are not aware of the current `value`, and our host does not know when the guests are ready to listen for events.
 
 That is it when it comes to cross-application communication. Now, whenever the state changes reactively, both the host and guests have a copy of the same value.
-
-## Colliding Styles
-
-To avoid having CSS collisions in the host, guest authors are advised to use one of the following solutions:
-
-- Use CSS-in-JS to have scoped CSS that never leaks out of the microfrontend.
-- Use CSS, but prefix each class with a unique identifier and avoid directly styling HTML tags.
