@@ -1,6 +1,6 @@
 # Microfrontends Example
 
-This repository is an example of how microfrontends can be implemented and integrated at runtime via JavaScript. The solution was inspired by [Cam Jackson's article](https://martinfowler.com/articles/micro-frontends.html).
+This repository is a detailed example of how microfrontends can be implemented and integrated at runtime via JavaScript. The solution was inspired by [Cam Jackson's article](https://martinfowler.com/articles/micro-frontends.html).
 
 ## Terminology
 
@@ -30,7 +30,6 @@ window.render_react_guest = (rootId: string) => {
   const root = document.getElementById(rootId);
   if (!root) {
     console.error(`Unable to find root with id: ${rootId}`);
-    window.unmount_react_guest = undefined;
     return;
   }
   const app = ReactDOM.createRoot(root);
@@ -41,6 +40,7 @@ window.render_react_guest = (rootId: string) => {
   );
   window.unmount_react_guest = () => {
     app.unmount();
+    window.unmount_react_guest = undefined;
   };
 };
 ```
