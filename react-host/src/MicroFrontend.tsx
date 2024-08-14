@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ScriptBuilder } from "./ScriptBuilder";
 
 interface MicroFrontendProps {
@@ -12,11 +12,14 @@ export function MicroFrontend({
   mainSource,
   supportSources,
 }: MicroFrontendProps) {
+  const [isLoading, setIsLoading] = useState(!scriptIsLoaded(id));
+
   useEffect(() => {
     let aborted = false;
 
     function safelyRenderMicroFrontend() {
       if (!aborted) {
+        setIsLoading(false);
         renderMicroFrontend(id);
       }
     }
@@ -25,8 +28,12 @@ export function MicroFrontend({
     const script = document.getElementById(scriptId);
 
     if (script) {
-      renderMicroFrontend(id);
-      script.onload = safelyRenderMicroFrontend;
+      if (scriptIsLoaded(id)) {
+        setIsLoading(false);
+        renderMicroFrontend(id);
+      } else {
+        script.onload = safelyRenderMicroFrontend;
+      }
     } else {
       supportSources?.forEach((src, i) =>
         ScriptBuilder.create()
@@ -48,7 +55,12 @@ export function MicroFrontend({
     };
   }, [id, mainSource, supportSources]);
 
-  return <div id={`${id}_root`}></div>;
+  return (
+    <Fragment>
+      {isLoading && <p>Loading {id}...</p>}
+      <div id={`${id}_root`}></div>
+    </Fragment>
+  );
 }
 
 function renderMicroFrontend(id: string) {
@@ -63,4 +75,8 @@ function unmountMicroFrontend(id: string) {
   if (typeof unmount === "function") {
     unmount();
   }
+}
+
+function scriptIsLoaded(id: string) {
+  return typeof window[`render_${id}` as keyof Window] === "function";
 }
