@@ -141,7 +141,7 @@ useEffect(() => {
 
 - `supportSources` is for additional JavaScript source files that enable the `mainSource` to run without issue. For example, building an Angular frontend generates two files: `main.js` and `polyfills.js`, the former contains our business logic while the latter is for an external dependency that Angular requires.
 
-We loop through the `supportSources` and append additional scripts if any were passed.
+We loop through the `supportSources` and append additional scripts if any were passed. You can do the same with stylesheets as well.
 
 ```ts
 // react-host/src/MicroFrontend.tsx
