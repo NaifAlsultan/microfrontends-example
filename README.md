@@ -83,7 +83,7 @@ export function MicroFrontend(props: MicroFrontendProps) {
 }
 ```
 
-After it renders, the `useEffect` function will execute. First, it checks whether the microfrontend's script is already in the DOM or not.
+After it renders, the `useEffect()` function will execute. First, it checks whether the microfrontend's script is already in the DOM or not.
 
 ```ts
 // react-host/src/MicroFrontend.tsx
@@ -170,7 +170,7 @@ useEffect(() => {
 
 ### Unmounting Microfrontends
 
-To unmount a microfrontend, we must call the unmount function provided by our guest in the cleanup function of `useEffect`.
+To unmount a microfrontend, we must call the unmount function provided by our guest in the cleanup function of `useEffect()`.
 
 ```ts
 // react-host/src/MicroFrontend.tsx
