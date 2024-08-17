@@ -12,6 +12,8 @@ A _guest_ is a microfrontend application that can be rendered within a host or i
 
 In this example, the host is implemented with React, but the solution is framework-agnostic and can be implemented with vanilla JavaScript or with any frontend framework. For demonstration purposes, the host integrates two guests. A React guest, and an Angular guest. Both the host and the guests are fully rendered at the client.
 
+![microfrontends demo](microfrontends-demo.gif)
+
 ## Implementing Guests
 
 You can implement a guest with vanilla JavaScript or with any frontend framework of your choice as long as you expose a function on the `window` object that renders your microfrontend.
