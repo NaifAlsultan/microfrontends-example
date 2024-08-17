@@ -5,12 +5,17 @@ import App from "./App.tsx";
 window.render_react_guest = (rootId: string) => {
   const root = document.getElementById(rootId);
   if (!root) {
-    console.error(`Unable to find root with ID: ${rootId}`);
+    console.error(`Unable to find root with id: ${rootId}`);
     return;
   }
-  ReactDOM.createRoot(root).render(
+  const app = ReactDOM.createRoot(root);
+  app.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   );
+  window.unmount_react_guest = () => {
+    app.unmount();
+    window.unmount_react_guest = undefined;
+  };
 };
