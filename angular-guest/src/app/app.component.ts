@@ -5,15 +5,10 @@ import { Component, HostListener } from "@angular/core";
   templateUrl: "./app.component.html",
 })
 export class AppComponent {
-  value = -1;
+  value = 0;
 
-  ngOnInit() {
-    const event = new Event("What is the current value?");
-    window.dispatchEvent(event);
-  }
-
-  @HostListener("window:Current value is", ["$event"])
-  handleValue(event: CustomEvent) {
-    this.value = event.detail;
+  @HostListener("window:increment", ["$event.detail"])
+  increment(newValue: number) {
+    this.value = newValue;
   }
 }

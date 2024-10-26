@@ -1,10 +1,10 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App.tsx";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./app.tsx";
 import { createBrowserRouter, Link, RouterProvider } from "react-router-dom";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+createRoot(document.getElementById("react-host")!).render(
+  <StrictMode>
     <RouterProvider
       router={createBrowserRouter([
         {
@@ -12,10 +12,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           element: <App />,
         },
         {
-          path: "/some-other-route",
+          path: "/other",
           element: <Link to="/">Navigate Back</Link>,
         },
       ])}
     />
-  </React.StrictMode>
+  </StrictMode>
 );

@@ -1,21 +1,17 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App.tsx";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./app.tsx";
 
-window.render_react_guest = (rootId: string) => {
-  const root = document.getElementById(rootId);
-  if (!root) {
-    console.error(`Unable to find root with id: ${rootId}`);
-    return;
-  }
-  const app = ReactDOM.createRoot(root);
-  app.render(
-    <React.StrictMode>
+export function mountMicrofrontend(root: HTMLElement) {
+  createRoot(root).render(
+    <StrictMode>
       <App />
-    </React.StrictMode>
+    </StrictMode>
   );
-  window.unmount_react_guest = () => {
-    app.unmount();
-    window.unmount_react_guest = undefined;
-  };
-};
+}
+
+const root = document.getElementById("react-guest");
+
+if (root) {
+  mountMicrofrontend(root);
+}

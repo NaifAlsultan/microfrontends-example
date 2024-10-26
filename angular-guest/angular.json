@@ -43,6 +43,7 @@
               "outputHashing": "all"
             },
             "development": {
+              "assets": ["src/remoteEntry.js"],
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
