@@ -12,7 +12,7 @@ export function Microfrontend({ src }: MicrofrontendProps) {
   });
 
   useEffect(() => {
-    let abort = false;
+    let ignore = false;
 
     import(/* @vite-ignore */ src)
       .then(({ mountMicrofrontend }) => {
@@ -20,7 +20,7 @@ export function Microfrontend({ src }: MicrofrontendProps) {
           isLoading: false,
           isError: false,
         });
-        if (!abort) {
+        if (!ignore) {
           mountMicrofrontend(ref.current);
         }
       })
@@ -33,7 +33,7 @@ export function Microfrontend({ src }: MicrofrontendProps) {
       });
 
     return () => {
-      abort = true;
+      ignore = true;
     };
   }, [src]);
 

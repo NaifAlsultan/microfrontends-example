@@ -1,6 +1,6 @@
 # Microfrontends Example
 
-This repository is a detailed example of how microfrontends can be implemented and integrated at runtime via JavaScript. The solution was inspired by [Cam Jackson's article](https://martinfowler.com/articles/micro-frontends.html).
+This repository is a detailed example of how microfrontends can be implemented and integrated at runtime via JavaScript. The solution was originally inspired by [Cam Jackson's article](https://martinfowler.com/articles/micro-frontends.html).
 
 ## Terminology
 
@@ -16,268 +16,82 @@ In this example, the host is implemented with React, but the solution is framewo
 
 ## Implementing Guests
 
-You can implement a guest with vanilla JavaScript or with any frontend framework of your choice as long as you expose a function on the `window` object that renders your microfrontend.
+You can implement a guest with vanilla JavaScript or with any frontend framework of your choice as long as you export a function that mounts your microfrontend under a given HTML element.
 
-For example, `react-guest/src/App.tsx` is an entry point for our React microfrontend and our goal is to render it on the host.
+For example, `react-guest/src/app.tsx` is an entry point for our React microfrontend and our goal is to render it on the host.
 
-In `react-guest/src/main.tsx`, we expose a function `render_react_guest` on the `window` object to:
-
-1. Look for an element in the DOM that has an `id` equal to `rootId`.
-2. Render the `App` component inside that element.
-3. Attach a function on `window` to gracefully unmount the microfrontend.
+In `react-guest/src/main.tsx`, we export a function `mountMicrofrontend` to render the `App` component under the given element `root`.
 
 ```tsx
 // react-guest/src/main.tsx
-window.render_react_guest = (rootId: string) => {
-  const root = document.getElementById(rootId);
-  if (!root) {
-    console.error(`Unable to find root with id: ${rootId}`);
-    return;
-  }
-  const app = ReactDOM.createRoot(root);
-  app.render(
-    <React.StrictMode>
+export function mountMicrofrontend(root: HTMLElement) {
+  createRoot(root).render(
+    <StrictMode>
       <App />
-    </React.StrictMode>
+    </StrictMode>
   );
-  window.unmount_react_guest = () => {
-    app.unmount();
-    window.unmount_react_guest = undefined;
-  };
-};
+}
 ```
 
-To let our guest run as a standalone application as well, we add a `script` tag in `index.html` that calls the `render_react_guest` function after the `window` loads.
+To let our guest run as a standalone application as well, we add an if-statement that checks whether an element with an ID equal to `angular-guest` exists in the DOM or not. If it exists, then we are running as a standalone application because we know that the host cannot have an element with this ID.
 
-```html
-<!-- react-guest/index.html -->
-<div id="root"></div>
-<script>
-  window.onload = () => {
-    window.render_react_guest("root");
-  };
-</script>
+```tsx
+// react-guest/src/main.tsx
+const root = document.getElementById("react-guest");
+
+if (root) {
+  mountMicrofrontend(root);
+}
 ```
 
-Implementing an Angular guest is similar to this, but it is a bit more complicated due to the asynchronous nature of creating an Angular application. Feel free to look at `angular-guest/` for an example.
-
-You can build both guests with `npm run build` and serve them through NGINX so that the host can reference them later.
+Implementing an Angular guest is similar to this, feel free to look at `angular-guest/` for an example.
 
 ## Implementing a Host
 
 ### Rendering Microfrontends
 
-Our goal at the host is to attach the renderer functions (e.g., `render_react_guest`) to the `window` object. To do that, we need to load the JavaScript files of our guests into the host. When the scripts are fully loaded, we get access to our renderer functions and can use them to render the microfrontends at any location in the DOM.
-
-In our React implementation, all of these steps will be handled in the `react-host/src/MicroFrontend.tsx` component which takes the microfrontend's JavaScript source as a prop.
+Our goal at the host is to dynamically import the mounting functions (i.e., `mountMicrofrontend`) and call them for each microfrontend. In our React implementation, we will handle this in the `react-host/src/microfrontend.tsx` component which takes the microfrontend's JavaScript source as a prop.
 
 ```tsx
-<MicroFrontend id="react_guest" mainSource="http://<path-to-guest>/index.js" />
+<Microfrontend src="http://localhost:5174/src/main.tsx" />
 ```
 
-Initially, this component renders an empty `div` tag with an `id`.
+Initially, this component renders an empty `div` element. When it renders, we will dynamically import the given JavaScript source and pass the `div` element to the exported `mountMicrofrontend` function.
 
 ```tsx
-// react-host/src/MicroFrontend.tsx
-export function MicroFrontend(props: MicroFrontendProps) {
-  // ...
-  return <div id={`${props.id}_root`}></div>;
+// react-host/src/microfrontend.tsx
+export function Microfrontend({ src }: MicroFrontendProps) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    import(src).then(({ mountMicrofrontend }) => {
+      mountMicrofrontend(ref.current);
+    });
+  }, [src]);
+
+  return <div ref={ref}></div>;
 }
 ```
 
-After it renders, the `useEffect()` function will execute. First, it checks whether the microfrontend's script is already in the DOM or not.
+Since the dynamic import is asynchronous, it is possible for it to be running even when the `Microfrontend` component has unmounted. To workaround that issue, we ignore the result of the dynamic import if the component gets unmounted.
 
-```ts
-// react-host/src/MicroFrontend.tsx
+```tsx
 useEffect(() => {
-  const scriptId = `micro_frontend_main_script_${props.id}`;
-  const script = document.getElementById(scriptId);
+  let ignore = false;
 
-  if (script) {
-    renderMicroFrontend(props.id);
-  }
-
-  // ...
-}, [props]);
-```
-
-If it is, we render the microfrontend by calling `renderMicroFrontend()` which is a wrapper around our renderer functions that are attached to the `window` object.
-
-```ts
-// react-host/src/MicroFrontend.tsx
-function renderMicroFrontend(id: string) {
-  const render = window[`render_${id}` as keyof Window];
-  // e.g., const render = window.render_react_guest;
-  if (typeof render === "function") {
-    render(`${id}_root`);
-    // e.g., window.render_react_guest("react_guest_root");
-  }
-}
-```
-
-If the `script` tag has not been appended yet, we dynamically create and append it using a custom-made builder. By leveraging the `onload` property of the `script` tag, we instruct the browser to execute the passed function as soon as the script fully loads.
-
-```ts
-// react-host/src/MicroFrontend.tsx
-useEffect(() => {
-  const scriptId = `micro_frontend_main_script_${props.id}`;
-  const script = document.getElementById(scriptId);
-
-  if (script) {
-    renderMicroFrontend(props.id);
-  } else {
-    // ...
-
-    ScriptBuilder.create()
-      .id(scriptId)
-      .src(props.mainSource)
-      .onload(() => renderMicroFrontend(props.id))
-      .append();
-  }
-}, [props]);
-```
-
-`MicroFrontend` takes a required `mainSource` prop and an optional `supportSources` prop:
-
-- `mainSource` is for the main JavaScript source file that attaches the renderer function to the `window` object and enable the microfrontend to be rendered. For example, after building `react-guest/`, you will find the `mainSource` under `react-guest/dist/assets`.
-
-- `supportSources` is for additional JavaScript source files that enable the `mainSource` to run without issue. For example, building an Angular frontend generates two files: `main.js` and `polyfills.js`, the former contains our business logic while the latter is for an external dependency that Angular requires.
-
-We loop through the `supportSources` and append additional scripts if any were passed. You can do the same with stylesheets as well.
-
-```ts
-// react-host/src/MicroFrontend.tsx
-useEffect(() => {
-  const scriptId = `micro_frontend_main_script_${props.id}`;
-  const script = document.getElementById(scriptId);
-
-  if (script) {
-    renderMicroFrontend(props.id);
-  } else {
-    props.supportSources?.forEach((src, i) =>
-      ScriptBuilder.create()
-        .id(`micro_frontend_support_script_${props.id}_${i + 1}`)
-        .src(src)
-        .append()
-    );
-
-    ScriptBuilder.create()
-      .id(scriptId)
-      .src(props.mainSource)
-      .onload(() => renderMicroFrontend(props.id))
-      .append();
-  }
-}, [props]);
-```
-
-### Unmounting Microfrontends
-
-To unmount a microfrontend, we must call the unmount function provided by our guest in the cleanup function of `useEffect()`.
-
-```ts
-// react-host/src/MicroFrontend.tsx
-useEffect(() => {
-  const scriptId = `micro_frontend_main_script_${props.id}`;
-  const script = document.getElementById(scriptId);
-
-  if (script) {
-    renderMicroFrontend(props.id);
-  } else {
-    props.supportSources?.forEach((src, i) =>
-      ScriptBuilder.create()
-        .id(`micro_frontend_support_script_${props.id}_${i + 1}`)
-        .src(src)
-        .append()
-    );
-
-    ScriptBuilder.create()
-      .id(scriptId)
-      .src(props.mainSource)
-      .onload(() => renderMicroFrontend(props.id))
-      .append();
-  }
-
-  // added a cleanup function below
-  return () => {
-    unmountMicroFrontend(props.id);
-  };
-}, [props]);
-```
-
-Similar to `renderMicroFrontend()`, we have `unmountMicroFrontend()` which is a wrapper around our unmount functions that are attached to the `window` object.
-
-```ts
-// react-host/src/MicroFrontend.tsx
-function unmountMicroFrontend(id: string) {
-  const unmount = window[`unmount_${id}` as keyof Window];
-  if (typeof unmount === "function") {
-    unmount();
-  }
-}
-```
-
-### Handling Delays
-
-Downloading, parsing, and loading scripts into the browser takes some time. What if the `MicroFrontend` component was unmounted before the scripts have fully loaded? With the above implementation, `renderMicroFrontend()` will still be called as soon as the script is loaded, but it will fail because it will not be able to find a DOM element with the given `id`.
-
-Rather than failing in this situation, we can abort the operation by defining a `boolean` variable `aborted` and setting it to `true` in the cleanup function.
-
-```ts
-// react-host/src/MicroFrontend.tsx
-useEffect(() => {
-  let aborted = false;
-
-  // ...
-
-  return () => {
-    aborted = true;
-    unmountMicroFrontend(props.id);
-  };
-}, [props]);
-```
-
-Before calling `renderMicroFrontend()` on load, we need to check if the operation has been aborted or not.
-
-```ts
-// react-host/src/MicroFrontend.tsx
-useEffect(() => {
-  let aborted = false;
-
-  function safelyRenderMicroFrontend() {
-    if (!aborted) {
-      renderMicroFrontend(props.id);
+  import(src).then(({ mountMicrofrontend }) => {
+    if (!ignore) {
+      mountMicrofrontend(ref.current);
     }
-  }
-
-  const scriptId = `micro_frontend_main_script_${props.id}`;
-  const script = document.getElementById(scriptId);
-
-  if (script) {
-    renderMicroFrontend(props.id);
-    // added the line below
-    script.onload = safelyRenderMicroFrontend;
-  } else {
-    props.supportSources?.forEach((src, i) =>
-      ScriptBuilder.create()
-        .id(`micro_frontend_support_script_${props.id}_${i + 1}`)
-        .src(src)
-        .append()
-    );
-
-    ScriptBuilder.create()
-      .id(scriptId)
-      .src(props.mainSource)
-      // modified the line below
-      .onload(safelyRenderMicroFrontend)
-      .append();
-  }
+  });
 
   return () => {
-    aborted = true;
-    unmountMicroFrontend(props.id);
+    ignore = true;
   };
-}, [props]);
+}, [src]);
 ```
+
+For learning purposes, this implementation is good enough. Feel free to look at the `Microfrontend` implementation provided in this repository for handling loading and errors.
 
 ## Implementing Cross-Application Communication
 
