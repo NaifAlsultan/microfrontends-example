@@ -20,7 +20,7 @@ You can implement a guest with vanilla JavaScript or with any frontend framework
 
 For example, `react-guest/src/app.tsx` is an entry point for our React microfrontend and our goal is to render it on the host.
 
-In `react-guest/src/main.tsx`, we export a function `mountMicrofrontend` to render the `App` component under the given element `root`.
+In `react-guest/src/main.tsx`, we export a function `mountMicrofrontend` to render the `App` component under a given element `root`.
 
 ```tsx
 // react-guest/src/main.tsx
@@ -33,10 +33,14 @@ export function mountMicrofrontend(root: HTMLElement) {
 }
 ```
 
-To let our guest run as a standalone application as well, we add an if-statement that checks whether an element with an ID equal to `angular-guest` exists in the DOM or not. If it exists, then we are running as a standalone application because we know that the host cannot have an element with this ID.
+To let our guest run as a standalone application as well, we will add an if-statement that checks whether an element with an ID equal to `react-guest` exists in the DOM or not. If it exists, then we are running as a standalone application because we know that the host cannot have an element with this ID by convention.
 
 ```tsx
 // react-guest/src/main.tsx
+export function mountMicrofrontend(root: HTMLElement) {
+  // ...
+}
+
 const root = document.getElementById("react-guest");
 
 if (root) {
@@ -44,13 +48,15 @@ if (root) {
 }
 ```
 
-Implementing an Angular guest is similar to this, feel free to look at `angular-guest/` for an example.
+Implementing an Angular guest is similar to this. Feel free to look at `angular-guest/` for an example.
 
 ## Implementing a Host
 
 ### Rendering Microfrontends
 
-Our goal at the host is to dynamically import the mounting functions (i.e., `mountMicrofrontend`) and call them for each microfrontend. In our React implementation, we will handle this in the `react-host/src/microfrontend.tsx` component which takes the microfrontend's JavaScript source as a prop.
+Our goal at the host is to dynamically import the mounting functions (i.e., `mountMicrofrontend`) and call them for each microfrontend that we want to render.
+
+In our React implementation, we will handle this in the `react-host/src/microfrontend.tsx` component which takes the microfrontend's JavaScript source as a prop.
 
 ```tsx
 <Microfrontend src="http://localhost:5174/src/main.tsx" />
@@ -73,9 +79,10 @@ export function Microfrontend({ src }: MicroFrontendProps) {
 }
 ```
 
-Since the dynamic import is asynchronous, it is possible for it to be running even when the `Microfrontend` component has unmounted. To workaround that issue, we ignore the result of the dynamic import if the component gets unmounted.
+Since the dynamic import is asynchronous, it is possible for it to be running even after the `Microfrontend` component has unmounted. To workaround that issue, we will ignore the dynamic import by not calling the `mountMicrofrontend` function if the component gets unmounted.
 
 ```tsx
+// react-host/src/microfrontend.tsx
 useEffect(() => {
   let ignore = false;
 
@@ -91,7 +98,7 @@ useEffect(() => {
 }, [src]);
 ```
 
-For learning purposes, this implementation is good enough. Feel free to look at the `Microfrontend` implementation provided in this repository for handling loading and errors.
+This is the base implementation, feel free to look at the `Microfrontend` implementation provided in this repository for handling loading and errors.
 
 ## Implementing Cross-Application Communication
 
@@ -100,7 +107,7 @@ Cross-application communication is implemented by dispatching and listening for 
 Suppose that we have a stateful `value` in our host, and we want to share it with our guests.
 
 ```tsx
-// react-host/src/App.tsx
+// react-host/src/app.tsx
 function App() {
   const [value, setValue] = useState(0);
 
@@ -108,87 +115,51 @@ function App() {
 }
 ```
 
-Our guests can talk to the host by dispatching an event, asking for the current `value` as soon as they mount.
-
-```ts
-// react-guest/src/App.tsx
-useEffect(() => {
-  // ...
-
-  // ask
-  const event = new Event("What is the current value?");
-  window.dispatchEvent(event);
-
-  // ...
-}, []);
-```
-
-They also need to listen for the response.
-
-```ts
-// react-guest/src/App.tsx
-useEffect(() => {
-  const controller = new AbortController();
-  const { signal } = controller;
-
-  // listen for the response
-  window.addEventListener("Current value is", handleValue, { signal });
-
-  // ask
-  const event = new Event("What is the current value?");
-  window.dispatchEvent(event);
-
-  return () => controller.abort();
-}, []);
-```
-
-Whenever we "hear" an event that is trying to tell us of the new value, we invoke the `handleValue` function. It simply updates the state of the guest.
+To increment the `value`, we will dispatch a custom event named `increment` containing the incremented value.
 
 ```tsx
-// react-guest/src/App.tsx
+// react-host/src/app.tsx
 function App() {
-  const [value, setValue] = useState(-1);
+  const [value, setValue] = useState(0);
 
-  // ...
-
-  function handleValue(event: Event) {
-    setValue((event as CustomEvent).detail);
+  function increment() {
+    const event = new CustomEvent("increment", { detail: value + 1 });
+    window.dispatchEvent(event);
   }
 
   // ...
 }
 ```
 
-Going back to our host, it can listen for this event and respond accordingly. Also, we need to inform the guests whenever `value` changes even when the guests do not explicitly ask us about the current value.
+Notice that the `increment` function does not use `setValue` to update the state, it only dispatches an event on the `window` object. To update the state, we will attach a listener that listens for the `increment` event and updates the `value` with `setValue`.
 
-```ts
-// react-host/src/App.tsx
-useEffect(() => {
-  const event = new CustomEvent("Current value is", { detail: value });
+```tsx
+// react-host/src/app.tsx
+function App() {
+  const [value, setValue] = useState(0);
 
-  const controller = new AbortController();
-  const { signal } = controller;
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
 
-  // respond to explicit questions
-  window.addEventListener(
-    "What is the current value?",
-    () => {
-      window.dispatchEvent(event);
-    },
-    { signal }
-  );
+    window.addEventListener(
+      "increment",
+      (event) => setValue((event as CustomEvent).detail),
+      { signal }
+    );
 
-  // announce when the value changes
-  window.dispatchEvent(event);
+    return () => controller.abort();
+  }, []);
 
-  return () => controller.abort();
-}, [value]);
+  function increment() {
+    const event = new CustomEvent("increment", { detail: value + 1 });
+    window.dispatchEvent(event);
+  }
+
+  // ...
+}
 ```
 
-Note that when we answer an explicit question, everyone can "hear" our answer because we dispatched the event on the `window` object.
+This approach establishes a two-way communication channel. Guests can also listen for and increment the `value` by dispatching the `increment` event using the same technique described above.
 
-At this point, you may wonder why our guests need to explicitly ask for the current `value`. Is it not enough if the host dispatches an event whenever the `value` changes?
-
-No, because when our guests initially render, they are not aware of the current `value`, and our host does not know when the guests are ready to listen for events.
-
-That is it when it comes to cross-application communication. Now, whenever the state changes reactively, both the host and guests have a copy of the same value.
+That is it when it comes to cross-application communication. Now, whenever the state changes reactively, both the host and guests have a copy of the same `value`.
